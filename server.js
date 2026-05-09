@@ -61,6 +61,8 @@ function cleanAndResizeSvg(svgBuffer, canvasWidth, canvasHeight, bleedMm) {
       .replace(/\bheight="[^"]*"/gi, '')
       .replace(/\bviewBox="[^"]*"/gi, '')
       .replace(/\bpreserveAspectRatio="[^"]*"/gi, '')
+      .replace(/\bxmlns(:[a-z]+)?="[^"]*"/gi, '')
+      .replace(/\bxmlns(:[a-z]+)?='[^']*'/gi, '')
       .trim();
     return `<svg${attrs ? ' ' + attrs : ''} width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
   });
