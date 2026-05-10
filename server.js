@@ -42,7 +42,7 @@ function cleanAndResizeSvg(svgBuffer, canvasWidth, canvasHeight, bleedMm) {
       const r = parseInt(hex6[1], 16);
       const g = parseInt(hex6[2], 16);
       const b = parseInt(hex6[3], 16);
-      return r > 210 && g > 210 && b > 210;
+      return r > 200 && g > 200 && b > 200;
     }
     return false;
   }
