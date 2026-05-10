@@ -107,7 +107,14 @@ app.post('/convert', upload.single('file'), async (req, res) => {
     const cleanedSvgBuffer = cleanAndResizeSvg(rawSvgBuffer, width, height, bleedMm);
 
     // Convert to PNG
-    const pngBuffer = await sharp(cleanedSvgBuffer, { density, limitInputPixels: false })
+    // Render at lower density first to save memory, then resize to target
+    const renderDensity = Math.min(density, 72);
+    const tempBuffer = await sharp(cleanedSvgBuffer, { density: renderDensity, limitInputPixels: false })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+
+    const pngBuffer = await sharp(tempBuffer, { limitInputPixels: false })
+      .resize(width, height, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png({ compressionLevel })
       .toBuffer();
 
