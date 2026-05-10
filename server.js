@@ -23,7 +23,49 @@ function cleanAndResizeSvg(svgBuffer, canvasWidth, canvasHeight, bleedMm) {
   svg = svg.replace(/<defs>\s*<\/defs>/gi, '');
   svg = svg.replace(/<g[^>]*>\s*<\/g>/gi, '');
 
-  // 2. REMOVE LIGHT/NEAR-WHITE BACKGROUND RECTS using brightness threshold
+  // 2. REMOVE LIGHT/NEAR-WHITE BACKGROUND PATHS AND RECTS
+  // Helper: check if a color is near-white (R,G,B all > 200)
+  function isLightColor(colorStr) {
+    if (!colorStr) return false;
+    colorStr = colorStr.trim().toLowerCase();
+    if (colorStr === 'white' || colorStr === '#fff' || colorStr === '#ffffff') return true;
+    const hex3 = colorStr.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/);
+    if (hex3) {
+      return parseInt(hex3[1]+hex3[1],16)>200 && parseInt(hex3[2]+hex3[2],16)>200 && parseInt(hex3[3]+hex3[3],16)>200;
+    }
+    const hex6 = colorStr.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/);
+    if (hex6) {
+      return parseInt(hex6[1],16)>200 && parseInt(hex6[2],16)>200 && parseInt(hex6[3],16)>200;
+    }
+    return false;
+  }
+
+  // Remove background PATH elements with light fill (typically the first path covering full canvas)
+  svg = svg.replace(/<path([^>]*)/>/gi, (match, attrs) => {
+    const fillAttr = attrs.match(/\bfill=["']([^"']*)["']/i);
+    if (fillAttr && isLightColor(fillAttr[1])) {
+      // Only remove if it has translate(0,0) or no transform (full-canvas background)
+      const transform = attrs.match(/\btransform=["'][^"']*["']/i);
+      if (!transform || /translate\s*\(\s*0\s*,\s*0\s*\)/i.test(transform[0])) {
+        return '';
+      }
+    }
+    return match;
+  });
+
+  // Also remove non-self-closing path tags with light fill
+  svg = svg.replace(/<path([^>]*)>([^<]*)<\/path>/gi, (match, attrs) => {
+    const fillAttr = attrs.match(/\bfill=["']([^"']*)["']/i);
+    if (fillAttr && isLightColor(fillAttr[1])) {
+      const transform = attrs.match(/\btransform=["'][^"']*["']/i);
+      if (!transform || /translate\s*\(\s*0\s*,\s*0\s*\)/i.test(transform[0])) {
+        return '';
+      }
+    }
+    return match;
+  });
+
+  // Remove background RECT elements with light fill
   function isLightColor(colorStr) {
     if (!colorStr) return false;
     colorStr = colorStr.trim().toLowerCase();
