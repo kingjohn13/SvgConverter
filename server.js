@@ -23,9 +23,25 @@ function cleanAndResizeSvg(svgBuffer, canvasWidth, canvasHeight, bleedMm) {
   svg = svg.replace(/<defs>\s*<\/defs>/gi, '');
   svg = svg.replace(/<g[^>]*>\s*<\/g>/gi, '');
 
-  // 2. REMOVE WHITE BACKGROUND RECTS
-  svg = svg.replace(/<rect[^>]*fill="(?:white|#fff|#ffffff|#FFFFFF)"[^>]*\/>/gi, '');
-  svg = svg.replace(/<rect[^>]*fill='(?:white|#fff|#ffffff)'[^>]*\/>/gi, '');
+  // 2. REMOVE WHITE/LIGHT BACKGROUND RECTS (all variations)
+  // Self-closing with fill attribute
+  svg = svg.replace(/<rect[^>]*fill="(?:white|#fff|#ffffff|#FFFFFF|#FFF)"[^>]*\/?>/gi, '');
+  svg = svg.replace(/<rect[^>]*fill='(?:white|#fff|#ffffff|#FFFFFF|#FFF)'[^>]*\/?>/gi, '');
+  // With separate closing tag
+  svg = svg.replace(/<rect[^>]*fill="(?:white|#fff|#ffffff|#FFFFFF|#FFF)"[^>]*>[^<]*<\/rect>/gi, '');
+  svg = svg.replace(/<rect[^>]*fill='(?:white|#fff|#ffffff|#FFFFFF|#FFF)'[^>]*>[^<]*<\/rect>/gi, '');
+  // Fill inside style attribute (self-closing)
+  svg = svg.replace(/<rect[^>]*style="[^"]*fill\s*:\s*(?:white|#fff|#ffffff|#FFFFFF)[^"]*"[^>]*\/?>/gi, '');
+  svg = svg.replace(/<rect[^>]*style='[^']*fill\s*:\s*(?:white|#fff|#ffffff|#FFFFFF)[^']*'[^>]*\/?>/gi, '');
+  // Fill inside style with separate closing tag
+  svg = svg.replace(/<rect[^>]*style="[^"]*fill\s*:\s*(?:white|#fff|#ffffff|#FFFFFF)[^"]*"[^>]*>[^<]*<\/rect>/gi, '');
+  // Full-canvas rects (width=100% or matching viewbox)
+  svg = svg.replace(/<rect[^>]*width="100%"[^>]*\/?>/gi, '');
+  svg = svg.replace(/<rect[^>]*width='100%'[^>]*\/?>/gi, '');
+  svg = svg.replace(/<rect[^>]*width="100%"[^>]*>[^<]*<\/rect>/gi, '');
+  // Remove background style from svg root
+  svg = svg.replace(/(<svg[^>]*?)\s*style="([^"]*?)background(?:-color)?\s*:\s*(?:white|#fff|#ffffff)[^"]*"/gi,
+    (m, pre, stylePre) => pre + (stylePre ? ` style="${stylePre}"` : ''));
 
   // 3. REMOVE STROKES
   svg = svg.replace(/\bstroke="(?!none)[^"]*"/gi, 'stroke="none"');
@@ -64,7 +80,7 @@ function cleanAndResizeSvg(svgBuffer, canvasWidth, canvasHeight, bleedMm) {
       .replace(/\bxmlns(:[a-z]+)?="[^"]*"/gi, '')
       .replace(/\bxmlns(:[a-z]+)?='[^']*'/gi, '')
       .trim();
-    return `<svg${attrs ? ' ' + attrs : ''} width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+    return `<svg${attrs ? ' ' + attrs : ''} width="${canvasWidth}" height="${canvasHeight}" viewBox="0 0 ${canvasWidth} ${canvasHeight}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="background:transparent">`;
   });
 
   // 7. WRAP IN TRANSFORM
@@ -110,6 +126,7 @@ app.post('/convert', upload.single('file'), async (req, res) => {
     // Render at lower density first to save memory, then resize to target
     const renderDensity = Math.min(density, 72);
     const tempBuffer = await sharp(cleanedSvgBuffer, { density: renderDensity, limitInputPixels: false })
+      .ensureAlpha()
       .png({ compressionLevel: 9 })
       .toBuffer();
 
