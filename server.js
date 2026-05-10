@@ -23,25 +23,44 @@ function cleanAndResizeSvg(svgBuffer, canvasWidth, canvasHeight, bleedMm) {
   svg = svg.replace(/<defs>\s*<\/defs>/gi, '');
   svg = svg.replace(/<g[^>]*>\s*<\/g>/gi, '');
 
-  // 2. REMOVE WHITE/LIGHT BACKGROUND RECTS (all variations)
-  // Self-closing with fill attribute
-  svg = svg.replace(/<rect[^>]*fill="(?:white|#fff|#ffffff|#FFFFFF|#FFF)"[^>]*\/?>/gi, '');
-  svg = svg.replace(/<rect[^>]*fill='(?:white|#fff|#ffffff|#FFFFFF|#FFF)'[^>]*\/?>/gi, '');
-  // With separate closing tag
-  svg = svg.replace(/<rect[^>]*fill="(?:white|#fff|#ffffff|#FFFFFF|#FFF)"[^>]*>[^<]*<\/rect>/gi, '');
-  svg = svg.replace(/<rect[^>]*fill='(?:white|#fff|#ffffff|#FFFFFF|#FFF)'[^>]*>[^<]*<\/rect>/gi, '');
-  // Fill inside style attribute (self-closing)
-  svg = svg.replace(/<rect[^>]*style="[^"]*fill\s*:\s*(?:white|#fff|#ffffff|#FFFFFF)[^"]*"[^>]*\/?>/gi, '');
-  svg = svg.replace(/<rect[^>]*style='[^']*fill\s*:\s*(?:white|#fff|#ffffff|#FFFFFF)[^']*'[^>]*\/?>/gi, '');
-  // Fill inside style with separate closing tag
-  svg = svg.replace(/<rect[^>]*style="[^"]*fill\s*:\s*(?:white|#fff|#ffffff|#FFFFFF)[^"]*"[^>]*>[^<]*<\/rect>/gi, '');
-  // Full-canvas rects (width=100% or matching viewbox)
-  svg = svg.replace(/<rect[^>]*width="100%"[^>]*\/?>/gi, '');
-  svg = svg.replace(/<rect[^>]*width='100%'[^>]*\/?>/gi, '');
-  svg = svg.replace(/<rect[^>]*width="100%"[^>]*>[^<]*<\/rect>/gi, '');
-  // Remove background style from svg root
-  svg = svg.replace(/(<svg[^>]*?)\s*style="([^"]*?)background(?:-color)?\s*:\s*(?:white|#fff|#ffffff)[^"]*"/gi,
-    (m, pre, stylePre) => pre + (stylePre ? ` style="${stylePre}"` : ''));
+  // 2. REMOVE LIGHT/NEAR-WHITE BACKGROUND RECTS using brightness threshold
+  function isLightColor(colorStr) {
+    if (!colorStr) return false;
+    colorStr = colorStr.trim().toLowerCase();
+    if (colorStr === 'white' || colorStr === '#fff' || colorStr === '#ffffff') return true;
+    // 3-digit hex: #rgb
+    const hex3 = colorStr.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/);
+    if (hex3) {
+      const r = parseInt(hex3[1]+hex3[1], 16);
+      const g = parseInt(hex3[2]+hex3[2], 16);
+      const b = parseInt(hex3[3]+hex3[3], 16);
+      return r > 200 && g > 200 && b > 200;
+    }
+    // 6-digit hex: #rrggbb
+    const hex6 = colorStr.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/);
+    if (hex6) {
+      const r = parseInt(hex6[1], 16);
+      const g = parseInt(hex6[2], 16);
+      const b = parseInt(hex6[3], 16);
+      return r > 210 && g > 210 && b > 210;
+    }
+    return false;
+  }
+
+  // Remove rect elements with light fill colors (attribute or style)
+  svg = svg.replace(/<rect([^>]*)>/gi, (match, attrs) => {
+    // Check fill attribute
+    const fillAttr = attrs.match(/\bfill=["']([^"']*)["']/i);
+    if (fillAttr && isLightColor(fillAttr[1])) return '';
+    // Check fill inside style
+    const styleAttr = attrs.match(/\bstyle=["'][^"']*fill\s*:\s*([^;}"'\s]+)/i);
+    if (styleAttr && isLightColor(styleAttr[1])) return '';
+    // Check width=100% (likely a background)
+    if (/\bwidth=["']100%["']/i.test(attrs) && /\bheight=["']100%["']/i.test(attrs)) return '';
+    return match;
+  });
+  // Also remove closing </rect> tags that were orphaned
+  svg = svg.replace(/<\/rect>/gi, '');
 
   // 3. REMOVE STROKES
   svg = svg.replace(/\bstroke="(?!none)[^"]*"/gi, 'stroke="none"');
